@@ -27,8 +27,8 @@ jobs:
       - name: Snyk test Java dependencies
         run: snyk test --severity-threshold=high  # Ejecuta el análisis de seguridad (solo vulnerabilidades altas o más graves)
 
-      - name: Upload Snyk report (opcional)
-        if: always()  # Este paso se ejecuta aunque falle el test
+      - name: Upload Snyk report 
+        if: always()  
         run: snyk test --json > snyk-report.json  # Exporta el reporte en JSON
 
       - uses: actions/upload-artifact@v4
