@@ -31,7 +31,7 @@ jobs:
         if: always()  # Este paso se ejecuta aunque falle el test
         run: snyk test --json > snyk-report.json  # Exporta el reporte en JSON
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: snyk-report
           path: snyk-report.json  # Sube el reporte como artefacto del pipeline
@@ -64,7 +64,7 @@ jobs:
         run: mvn clean verify  # Ejecuta tests y genera el reporte de cobertura con JaCoCo
 
       - name: Upload JaCoCo Report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: jacoco-report
           path: target/site/jacoco/  # Sube el reporte generado por JaCoCo
@@ -123,7 +123,7 @@ jobs:
         run: mvn clean package -DskipTests  # Empaqueta sin volver a correr los tests
 
       - name: Upload JAR artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: app-jar
           path: target/*.jar  # Sube el archivo .jar generado como artefacto
