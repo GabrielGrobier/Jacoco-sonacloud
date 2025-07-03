@@ -1,0 +1,129 @@
+name: Spring Boot CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main  # El pipeline se ejecuta cuando se hace push a la rama 'main'
+
+jobs:
+
+  # 1. Análisis de Seguridad con Snyk
+  snyk-scan:
+    name: Snyk Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4  # Clona el repositorio
+
+      - name: Install Snyk CLI
+        run: npm install -g snyk  # Instala la CLI de Snyk
+
+      - name: Authenticate Snyk CLI
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}  # Usa el token guardado en GitHub Secrets
+        run: snyk auth $SNYK_TOKEN  # Autentica la CLI con tu cuenta
+
+      - name: Snyk test Java dependencies
+        run: snyk test --severity-threshold=high  # Ejecuta el análisis de seguridad (solo vulnerabilidades altas o más graves)
+
+      - name: Upload Snyk report (opcional)
+        if: always()  # Este paso se ejecuta aunque falle el test
+        run: snyk test --json > snyk-report.json  # Exporta el reporte en JSON
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: snyk-report
+          path: snyk-report.json  # Sube el reporte como artefacto del pipeline
+
+  # 2. Pruebas unitarias y cobertura con JaCoCo
+  test:
+    name: Run Tests with JaCoCo
+    runs-on: ubuntu-latest
+    needs: snyk-scan  # Solo se ejecuta si pasó snyk-scan
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2
+
+      - name: Build and test
+        run: mvn clean verify  # Ejecuta tests y genera el reporte de cobertura con JaCoCo
+
+      - name: Upload JaCoCo Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/  # Sube el reporte generado por JaCoCo
+
+  # 3. Análisis de calidad con SonarCloud
+  sonar-analysis:
+    name: SonarCloud Analysis
+    runs-on: ubuntu-latest
+    needs: test  # Se ejecuta solo si pasaron los tests
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2
+
+      - name: Run SonarCloud Analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  # Token de SonarCloud guardado en GitHub Secrets
+        run: | 
+            mvn verify sonar:sonar \
+            -Dsonar.projectKey=GabrielGrobier_Jacoco-sonacloud \      
+            -Dsonar.organization=GabrielGrobier \                
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.login=${SONAR_TOKEN}
+
+  # 4. Empaquetado de la aplicación
+  build:
+    name: Build Jar
+    runs-on: ubuntu-latest
+    needs: sonar-analysis  # Se ejecuta solo si pasó el análisis de SonarCloud
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Package application
+        run: mvn clean package -DskipTests  # Empaqueta sin volver a correr los tests
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-jar
+          path: target/*.jar  # Sube el archivo .jar generado como artefacto
