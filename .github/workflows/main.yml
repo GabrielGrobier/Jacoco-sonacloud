@@ -21,26 +21,31 @@ jobs:
 
       - name: Authenticate Snyk CLI
         env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}  # Usa el token guardado en GitHub Secrets
-        run: snyk auth $SNYK_TOKEN  # Autentica la CLI con tu cuenta
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}  # Token guardado en GitHub Secrets
+        run: snyk auth $SNYK_TOKEN
 
       - name: Snyk test Java dependencies
-        run: snyk test --severity-threshold=high  # Ejecuta el análisis de seguridad (solo vulnerabilidades altas o más graves)
+        run: snyk test --severity-threshold=high  # Analiza vulnerabilidades de severidad alta o mayor
 
-      - name: Upload Snyk report 
-        if: always()  
-        run: snyk test --json > snyk-report.json  # Exporta el reporte en JSON
+      - name: Generate Snyk JSON Report
+        if: always()
+        run: |
+          echo "Generando reporte JSON de Snyk..."
+          snyk test --json > snyk-report.json || echo "Falló snyk test, pero se continúa"
+          ls -lh snyk-report.json || echo "No se generó el reporte"
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload Snyk JSON Report
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: snyk-report
-          path: snyk-report.json  # Sube el reporte como artefacto del pipeline
+          path: snyk-report.json
 
   # 2. Pruebas unitarias y cobertura con JaCoCo
   test:
     name: Run Tests with JaCoCo
     runs-on: ubuntu-latest
-    needs: snyk-scan  # Solo se ejecuta si pasó snyk-scan
+    needs: snyk-scan  # Solo se ejecuta si pasó el escaneo de Snyk
 
     steps:
       - name: Checkout code
@@ -61,19 +66,19 @@ jobs:
             ${{ runner.os }}-m2
 
       - name: Build and test
-        run: mvn clean verify  # Ejecuta tests y genera el reporte de cobertura con JaCoCo
+        run: mvn clean verify  # Ejecuta los tests y genera reporte de cobertura JaCoCo
 
       - name: Upload JaCoCo Report
         uses: actions/upload-artifact@v4
         with:
           name: jacoco-report
-          path: target/site/jacoco/  # Sube el reporte generado por JaCoCo
+          path: target/site/jacoco/
 
-  # 3. Análisis de calidad con SonarCloud
+  # 3. Análisis de calidad de código con SonarCloud
   sonar-analysis:
     name: SonarCloud Analysis
     runs-on: ubuntu-latest
-    needs: test  # Se ejecuta solo si pasaron los tests
+    needs: test  # Solo se ejecuta si pasaron los tests
 
     steps:
       - name: Checkout code
@@ -95,19 +100,19 @@ jobs:
 
       - name: Run SonarCloud Analysis
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  # Token de SonarCloud guardado en GitHub Secrets
-        run: | 
-            mvn verify sonar:sonar \
-            -Dsonar.projectKey=GabrielGrobier_Jacoco-sonacloud \      
-            -Dsonar.organization=GabrielGrobier \                
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  # Token SonarCloud desde Secrets
+        run: |
+          mvn verify sonar:sonar \
+            -Dsonar.projectKey=GabrielGrobier_Jacoco-sonacloud \
+            -Dsonar.organization=GabrielGrobier \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.login=${SONAR_TOKEN}
 
-  # 4. Empaquetado de la aplicación
+  # 4. Empaquetado final de la aplicación
   build:
     name: Build Jar
     runs-on: ubuntu-latest
-    needs: sonar-analysis  # Se ejecuta solo si pasó el análisis de SonarCloud
+    needs: sonar-analysis  # Solo se ejecuta si pasa el análisis de calidad
 
     steps:
       - name: Checkout code
@@ -120,10 +125,10 @@ jobs:
           java-version: '17'
 
       - name: Package application
-        run: mvn clean package -DskipTests  # Empaqueta sin volver a correr los tests
+        run: mvn clean package -DskipTests  # Empaqueta sin volver a ejecutar pruebas
 
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-jar
-          path: target/*.jar  # Sube el archivo .jar generado como artefacto
+          path: target/*.jar  # Sube el .jar como artefacto del pipeline
