@@ -79,7 +79,7 @@ jobs:
     name: SonarCloud Analysis
     runs-on: ubuntu-latest
     needs: test  # Solo se ejecuta si pasaron los tests
-
+  
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
