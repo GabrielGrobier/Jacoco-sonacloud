@@ -1,0 +1,41 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-container
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: fullstack1
+      MYSQL_USER: tuUsuario
+      MYSQL_PASSWORD: tuContraseña
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  java:
+    build:
+      context: .
+      dockerfile: dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: ["java", "-jar", "app.jar"]
+    deploy:
+      resource:
+        limits:
+         # Máximo uso de memoria para el servicio Java
+          memory: 1G
+          # Máximo un núcleo completo de CPU
+          cpus: "1.0"
+        reservations:
+         # Memoria reservada para el servicio Java
+          memory: 512M
+           # Reserva medio núcleo de CPU
+          cpus: "0.5"
+
+      

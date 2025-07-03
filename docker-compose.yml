@@ -1,0 +1,13 @@
+services:
+  #Define los servicios que se ejecutaran que en este caso se llama java
+  java:
+    build:
+    #especifica la ubicacion del archivo dockerfile 
+      context: .
+     #nombre del archivo dockerfile  
+      dockerfile: dockerfile
+    # puertos que utilizara el servicio 
+    ports:
+      - "8080:8080"
+    #Especifica el comando que se ejecutara dentro del contenedor 
+    command: ["java","-jar","app.jar"]
